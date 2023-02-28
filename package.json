@@ -1,6 +1,6 @@
 {
-	"name": "öplusplus-syntax-highlighter",
-	"version": "1.0",
+	"name": "oplusplus-syntax-highlighter",
+	"version": "1.0.0",
 	"engines": {
 		"vscode": "^1.74.0"
 	},
