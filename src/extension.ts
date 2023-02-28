@@ -233,6 +233,11 @@ class DocumentSemanticTokensProvider implements vscode.DocumentSemanticTokensPro
 		for (let i = 0; i < compilerTokens.length; i++) {
 			const token = compilerTokens[i];
 
+			token.value = token.value.split("\n").join("\\n");
+				//split("\r").join("\\r").
+				//split("\"").join("\\\"");
+				//split("\\").join("\\\\");
+
 			let len = token.value.length;
 			
 			if (token.type == "StringLiteral")
