@@ -17,7 +17,33 @@
 					".ö"
 				]
 			}
-		]
+		],
+		"commands": [
+			{
+			  "command": "oplusplus-syntax-highlighter.runAST",
+			  "title": "Ö++: Run the program with the AST Interpreter"
+			},
+			{
+				"command": "oplusplus-syntax-highlighter.runBytecode",
+				"title": "Ö++: Run the program with the Bytecode Interpreter"
+			  },
+			  {
+				"command": "oplusplus-syntax-highlighter.runASM",
+				"title": "Ö++: Run the program with Assembly"
+			  },
+			  {
+				"command": "oplusplus-syntax-highlighter.stop",
+				"title": "Ö++: Stop program execution"
+			  },
+			  {
+				"command": "oplusplus-syntax-highlighter.setQuiet",
+				"title": "Ö++: Hide verbose compiler output"
+			  },
+			  {
+				"command": "oplusplus-syntax-highlighter.setLoad",
+				"title": "Ö++: Show verbose compiler output"
+			  }
+		  ]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

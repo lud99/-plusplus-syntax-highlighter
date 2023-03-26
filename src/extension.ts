@@ -2,13 +2,17 @@ import * as vscode from 'vscode';
 
 import util = require("node:util");
 const exec = util.promisify(require("node:child_process").exec);
+const spawn = require('child_process').spawn;
 
 const tokenTypes = new Map<string, number>();
 const tokenModifiers = new Map<string, number>();
 
 const exePath = "D:/Spel/Programming/C++/ÖPlusPlus/Debug/ÖPlusPlus.exe";
+const exeDir = "D:/Spel/Programming/C++/ÖPlusPlus/Debug";
+//const exeDirectory = workingDir + "/Debug";
+const exeFilename = "ÖPlusPlus.exe";
 
-function convertToVSCodeTokenTypes (compilerText: string): string {
+function convertToVSCodeTokenTypes(compilerText: string): string {
 
 	const table = new Map<string, string>();
 
@@ -40,7 +44,7 @@ function convertToVSCodeTokenTypes (compilerText: string): string {
 	table.set("GreaterThan", "operator");
 	table.set("LessThanEqual", "operator");
 	table.set("GreaterThanEqual", "operator");
-	
+
 	table.set("RightArrow", "operator");
 
 	table.set("PostIncrement", "operator");
@@ -59,71 +63,71 @@ function convertToVSCodeTokenTypes (compilerText: string): string {
 	table.set("Variable", "variable");
 	table.set("FunctionName", "function");
 
-/*
-		"Variable",
-
-		"Semicolon",
-		"Comma",
-		"Colon",
-
-		"Add",
-		"Subtract",
-		"Multiply",
-		"Divide",
-		"PlusEquals",
-		"MinusEquals",
-
-		"SetEquals",
-		"CompareEquals",
-		"NotEquals",
-		"LessThan",
-		"GreaterThan",
-		"LessThanEqual",
-		"GreaterThanEqual",
-
-		"RightArrow",
-
-		"And",
-		"Or",
-		"Not",
-		"LeftShift",
-		"RightShift",
-		"Xor",
-		"Modulus",
-
-		"PostIncrement",
-		"PreIncrement",
-		"PostDecrement",
-		"PreDecrement",
-
-		"LeftParentheses",
-		"RightParentheses",
-		"LeftCurlyBracket",
-		"RightCurlyBracket",
-		"LeftSquareBracket",
-		"RightSquareBracket",
-
-		"FunctionName",
-
-		"If",
-		"Else",
-		"While",
-		"For",
-		"Break",
-		"Continue",
-		"Return",
-		"Global"*/
+	/*
+			"Variable",
 	
+			"Semicolon",
+			"Comma",
+			"Colon",
+	
+			"Add",
+			"Subtract",
+			"Multiply",
+			"Divide",
+			"PlusEquals",
+			"MinusEquals",
+	
+			"SetEquals",
+			"CompareEquals",
+			"NotEquals",
+			"LessThan",
+			"GreaterThan",
+			"LessThanEqual",
+			"GreaterThanEqual",
+	
+			"RightArrow",
+	
+			"And",
+			"Or",
+			"Not",
+			"LeftShift",
+			"RightShift",
+			"Xor",
+			"Modulus",
+	
+			"PostIncrement",
+			"PreIncrement",
+			"PostDecrement",
+			"PreDecrement",
+	
+			"LeftParentheses",
+			"RightParentheses",
+			"LeftCurlyBracket",
+			"RightCurlyBracket",
+			"LeftSquareBracket",
+			"RightSquareBracket",
+	
+			"FunctionName",
+	
+			"If",
+			"Else",
+			"While",
+			"For",
+			"Break",
+			"Continue",
+			"Return",
+			"Global"*/
+
 
 	let s = "";
 
 	if (table.has(compilerText))
 		return table!.get(compilerText)!;
-	else 
+	else
 		return "";
 }
 
-const legend = (function() {
+const legend = (function () {
 	const tokenTypesLegend = [
 		'comment', 'string', 'keyword', 'number', 'regexp', 'operator', 'namespace',
 		'type', 'struct', 'class', 'interface', 'enum', 'typeParameter', 'function',
@@ -140,8 +144,69 @@ const legend = (function() {
 	return new vscode.SemanticTokensLegend(tokenTypesLegend, tokenModifiersLegend);
 })();
 
+let cmd: any;
+let abortController: any;
+let quiet: boolean = true;
+
+const commandHandlerRunAST = async () => {
+	if (!vscode.window.activeTextEditor) return vscode.window.showErrorMessage("No active document to run");
+
+	const text = vscode.window.activeTextEditor.document.getText();
+	const filename = vscode.window.activeTextEditor.document.fileName.split("\\").slice(-1)[0];
+
+	await executeCode(filename, text, "-ast");
+};
+const commandHandlerRunBytecode = async () => {
+	if (!vscode.window.activeTextEditor) return vscode.window.showErrorMessage("No active document to run");
+
+	const text = vscode.window.activeTextEditor.document.getText();
+	const filename = vscode.window.activeTextEditor.document.fileName.split("\\").slice(-1)[0];
+
+	await executeCode(filename, text, "-bytecode");
+};
+const commandHandlerRunASM = async () => {
+	if (!vscode.window.activeTextEditor) return vscode.window.showErrorMessage("No active document to run");
+
+	const text = vscode.window.activeTextEditor.document.getText();
+	const filename = vscode.window.activeTextEditor.document.fileName.split("\\").slice(-1)[0];
+
+	await executeCode(filename, text, "-asm");
+};
+
+const stopExecution = () => {
+	if (abortController)
+		abortController.abort();
+
+	if (!cmd) 
+	{
+		vscode.window.showInformationMessage("No program to stop");
+		return;
+	}
+
+	abortController.abort();
+	cmd = null;
+	abortController = new AbortController();
+
+	vscode.window.showInformationMessage("Stopped the program");
+	programOutput.appendLine("Stopped the program");
+	programOutput.appendLine("");
+};
+
+let programOutput: vscode.OutputChannel;
+
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.languages.registerDocumentSemanticTokensProvider({ language: 'ö' }, new DocumentSemanticTokensProvider(), legend));
+
+	programOutput = vscode.window.createOutputChannel("Ö++ Program Output");
+
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.runAST', commandHandlerRunAST));
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.runBytecode', commandHandlerRunBytecode));
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.runASM', commandHandlerRunASM));
+
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.stop', stopExecution));
+
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.setQuiet', () => quiet = true));
+	context.subscriptions.push(vscode.commands.registerCommand('oplusplus-syntax-highlighter.setLoad', () => quiet = false));
 }
 
 interface IParsedToken {
@@ -152,38 +217,124 @@ interface IParsedToken {
 	tokenModifiers: string[];
 }
 
-async function runCompiler(
-    text: string
-): Promise<string> {
-    let stdout = "";
-    try {
+const getLinesFromText = (text: string, extraQuotes: boolean = true) => {
+	let lines = text.split("\n");
 
-		let lines = text.split("\n");
-		
-		// Escape string
-		lines = lines.map(line => line.split("\"").join("\"\"")); 
+	// Escape string
+	lines = lines.map(line => line.split("\"").join("\"\""));
 
-		// Remove newlines
-		lines = lines.map(line => line.split("\n").join(""));
+	// Remove newlines
+	lines = lines.map(line => line.split("\n").join(""));
 
-		const lineArgs = lines.map(line => `"${line}"`).join(" ");
+	const lineArgs = lines.map(line => `"${line}"`);
+	
+	if (extraQuotes)
+		return lines.map(line => `"${line}"`).join(" ");
 
-		let cmd = `${exePath} -tokens ${lineArgs}`;
-        
+	return lines.join(" ");
+} 
 
-		console.log(cmd);
+const getLinesFromTextForSpawn = (text: string) => {
+	let lines = text.split("\n");
 
-		const output = await exec(cmd);
+	// Remove newlines and split with spaces inbetween
+	const seperatedLines = lines.map(line => line.split("\n").join("")).join(" ");
 
-		console.log(output);
+	return seperatedLines;
+} 
 
-        stdout = output.stdout;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-       console.error(e);
-    }
+async function executeCode(filename: string, text: string, method: string, arg: string = "" ): Promise<void> {
+	return new Promise((resolve, reject) => {
+		let workspaceDir = "";
+		if (vscode.workspace.workspaceFolders !== undefined) {
+			workspaceDir = vscode.workspace.workspaceFolders[0].uri.fsPath ; 
+		} 
+		else {
+			vscode.window.showErrorMessage("Working folder not found");
+			return;
+		}
 
-    return stdout;
+		let methodString: string = "";
+		if (method == "-ast") methodString = "AST Interpreter";
+		if (method == "-bytecode") methodString = "Bytecode Interpreter";
+		if (method == "-asm") methodString = "Assembly Compiler";
+
+		if (cmd)
+		{
+			programOutput.appendLine(`Program already running, terminating it.`);
+			abortController.abort();
+			cmd = null;
+		}
+
+		programOutput.appendLine(`Running '${filename}' with the ${methodString}:`);
+
+		abortController = new AbortController();
+
+		cmd  = spawn(exeFilename, [method, quiet ? "-q" : "", "-buildDir", workspaceDir + "\\build", "-fc", getLinesFromTextForSpawn(text)], 
+			{ cwd: exeDir, signal: abortController.signal });
+
+		cmd.stdout.setEncoding("utf-8");
+		cmd.stderr.setEncoding("utf-8");
+
+		cmd.stdout.on('data', function(data: string) {
+			data.split("\n").forEach(line => line != "" && programOutput.appendLine(`${line}`));
+		});
+	
+		cmd.stderr.on('data', function(data: string) {
+			programOutput.appendLine("error: " + data);
+
+			vscode.window.showErrorMessage("Execution error: " + data);
+
+			cmd = null;
+
+			return reject(data);
+		});
+	
+		cmd.on('close', function(code: any) {
+			cmd = null;
+
+			// peaceful termination
+			if (code == null) {
+				programOutput.appendLine("");
+				return resolve();
+			}
+
+			if (code == 0)
+			{
+				programOutput.appendLine("Execution finished successfully");
+				return resolve();
+			}
+			else
+			{
+				programOutput.appendLine("Execution finished unexpectedly with error code " + code);	
+				return reject(code);
+			}
+		});
+	});
+}
+
+async function getTokensFromCompiler(text: string, arg: string = "-tokens" ): Promise<string> {
+	let stdout = "";
+	try {
+		let cmd = `${exePath} ${arg} -fc ${getLinesFromText(text)}`;
+
+		const output = await exec(cmd, { timeout: 5000 });
+
+		//console.log("Command:", cmd);
+		//console.log("Output:", output.stdout);
+
+		stdout = output.stdout;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	} catch (e: any) {
+		//console.error(e);
+
+		if (e.killed)
+			vscode.window.showErrorMessage("Token generation timed out");
+		//else
+		//	programOutput.appendLine("Code error: " + e.stdout);
+	}
+
+	return stdout;
 }
 
 class DocumentSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
@@ -221,9 +372,7 @@ class DocumentSemanticTokensProvider implements vscode.DocumentSemanticTokensPro
 	private async _parseText(text: string): Promise<IParsedToken[]> {
 		const r: IParsedToken[] = [];
 
-		let compilerTokens = JSON.parse(await runCompiler(text));
-
-		console.log(compilerTokens);
+		let compilerTokens = JSON.parse(await getTokensFromCompiler(text));
 
 		let line = 0;
 		let startOffset = 0;
@@ -234,12 +383,12 @@ class DocumentSemanticTokensProvider implements vscode.DocumentSemanticTokensPro
 			const token = compilerTokens[i];
 
 			token.value = token.value.split("\n").join("\\n");
-				//split("\r").join("\\r").
-				//split("\"").join("\\\"");
-				//split("\\").join("\\\\");
+			//split("\r").join("\\r").
+			//split("\"").join("\\\"");
+			//split("\\").join("\\\\");
 
 			let len = token.value.length;
-			
+
 			if (token.type == "StringLiteral")
 				len += 2;
 			if (token.type == "SingleLineComment")
@@ -273,39 +422,6 @@ class DocumentSemanticTokensProvider implements vscode.DocumentSemanticTokensPro
 				tokenModifiers: []
 			});
 		};
-
-		/*const lines = text.split(/\r\n|\r|\n/);
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			let currentOffset = 0;
-			do {
-				const openOffset = line.indexOf('[', currentOffset);
-				if (openOffset === -1) {
-					break;
-				}
-				const closeOffset = line.indexOf(']', openOffset);
-				if (closeOffset === -1) {
-					break;
-				}
-				const tokenData = this._parseTextToken(line.substring(openOffset + 1, closeOffset));
-				r.push({
-					line: i,
-					startCharacter: openOffset + 1,
-					length: closeOffset - openOffset - 1,
-					tokenType: tokenData.tokenType,
-					tokenModifiers: tokenData.tokenModifiers
-				});
-				currentOffset = closeOffset;
-			} while (true);
-		}*/
 		return r;
-	}
-
-	private _parseTextToken(text: string): { tokenType: string; tokenModifiers: string[]; } {
-		const parts = text.split('.');
-		return {
-			tokenType: parts[0],
-			tokenModifiers: parts.slice(1)
-		};
 	}
 }
