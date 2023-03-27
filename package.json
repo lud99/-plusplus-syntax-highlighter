@@ -1,6 +1,7 @@
 {
 	"name": "oplusplus-syntax-highlighter",
 	"version": "1.0.0",
+	"icon": "icons/oplusplus_logo.png",
 	"engines": {
 		"vscode": "^1.74.0"
 	},
@@ -15,7 +16,11 @@
 				"id": "ö",
 				"extensions": [
 					".ö"
-				]
+				],
+				"icon": {
+					"light": "./icons/oplusplus_logo_128px.png",
+					"dark": "./icons/oplusplus_logo_128px.png"
+				}
 			}
 		],
 		"commands": [

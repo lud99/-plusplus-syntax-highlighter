@@ -302,11 +302,13 @@ async function executeCode(filename: string, text: string, method: string, arg: 
 			if (code == 0)
 			{
 				programOutput.appendLine("Execution finished successfully");
+				programOutput.appendLine("");
 				return resolve();
 			}
 			else
 			{
 				programOutput.appendLine("Execution finished unexpectedly with error code " + code);	
+				programOutput.appendLine("");
 				return reject(code);
 			}
 		});
